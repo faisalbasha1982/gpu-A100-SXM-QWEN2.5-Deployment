@@ -1,0 +1,31 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: vllm-tp, namespace: inference }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: vllm-tp } }
+  template:
+    metadata: { labels: { app: vllm-tp } }
+    spec:
+      containers:
+      - name: vllm
+        image: vllm/vllm-openai:latest
+        args: ["--model","Qwen/Qwen2.5-14B-Instruct","--tensor-parallel-size","2","--max-model-len","8192","--gpu-memory-utilization","0.90"]
+        ports: [{ containerPort: 8000 }]
+        env: [{ name: HF_HOME, value: /hf }]
+        resources:
+          limits: { nvidia.com/gpu: 2 }
+        volumeMounts:
+        - { name: hf-cache, mountPath: /hf }
+        - { name: shm, mountPath: /dev/shm }
+      volumes:
+      - { name: hf-cache, hostPath: { path: /home/jl_fs/hf, type: DirectoryOrCreate } }
+      - { name: shm, emptyDir: { medium: Memory, sizeLimit: 16Gi } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: vllm-tp, namespace: inference }
+spec:
+  selector: { app: vllm-tp }
+  ports: [{ port: 8000, targetPort: 8000 }]
